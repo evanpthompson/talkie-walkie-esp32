@@ -179,6 +179,23 @@ func (m *Machine) ReceiveRelease(sender uint16) {
 	}
 }
 
+// ReceiveCollision processes a received COLLISION frame reporting that
+// lower and higher were observed contending for the floor (the report a
+// bystander sends after ReceiveClaim returns a non-nil Collision). If
+// the local device is higher and currently Holding, ADR-0005 requires
+// it to back off: in the hidden-terminal case it cannot hear lower
+// directly, so this report is the only way it learns of the conflict.
+// It reports whether it backed off.
+func (m *Machine) ReceiveCollision(lower, higher uint16, now Tick) bool {
+	if m.status != Holding || higher != m.localID {
+		return false
+	}
+	m.status = Busy
+	m.holder = lower
+	m.lastHeard = now
+	return true
+}
+
 // AdvanceResult is what the caller must do after Advance.
 type AdvanceResult struct {
 	Released      bool // was Busy; hold window expired -> now Idle

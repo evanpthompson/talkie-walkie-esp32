@@ -220,6 +220,56 @@ func TestHoldingReceiveReleaseNoop(t *testing.T) {
 	}
 }
 
+func TestHoldingReceiveCollisionNamingSelfAsHigherBacksOff(t *testing.T) {
+	m := newHolding(t, 10, 0)
+	if !m.ReceiveCollision(5, 10, 3) {
+		t.Fatal("ReceiveCollision naming us as higher = false, want true (back off)")
+	}
+	if m.Status() != Busy || m.Holder() != 5 {
+		t.Fatalf("Status()=%v Holder()=%d, want Busy holder=5", m.Status(), m.Holder())
+	}
+}
+
+func TestHoldingReceiveCollisionNamingSelfAsLowerNoop(t *testing.T) {
+	m := newHolding(t, 5, 0)
+	if m.ReceiveCollision(5, 10, 3) {
+		t.Fatal("ReceiveCollision naming us as lower = true, want false")
+	}
+	if m.Status() != Holding {
+		t.Fatalf("Status() = %v, want Holding (unaffected)", m.Status())
+	}
+}
+
+func TestHoldingReceiveCollisionAboutOthersNoop(t *testing.T) {
+	m := newHolding(t, 7, 0)
+	if m.ReceiveCollision(1, 2, 3) {
+		t.Fatal("ReceiveCollision about unrelated ids = true, want false")
+	}
+	if m.Status() != Holding {
+		t.Fatalf("Status() = %v, want Holding (unaffected)", m.Status())
+	}
+}
+
+func TestIdleReceiveCollisionNoop(t *testing.T) {
+	m := New(10)
+	if m.ReceiveCollision(5, 10, 3) {
+		t.Fatal("ReceiveCollision while Idle = true, want false (nothing to back off from)")
+	}
+	if m.Status() != Idle {
+		t.Fatalf("Status() = %v, want Idle", m.Status())
+	}
+}
+
+func TestBusyReceiveCollisionNoop(t *testing.T) {
+	m := newBusy(t, 10, 3, 0)
+	if m.ReceiveCollision(3, 10, 1) {
+		t.Fatal("ReceiveCollision while Busy = true, want false (not transmitting, nothing to back off from)")
+	}
+	if m.Status() != Busy || m.Holder() != 3 {
+		t.Fatalf("Status()=%v Holder()=%d, want unchanged Busy holder=3", m.Status(), m.Holder())
+	}
+}
+
 func TestHoldingAdvanceBeforeWarn(t *testing.T) {
 	m := newHolding(t, 1, 0)
 	res := m.Advance(TransmitTimeoutTicks - WarnBeforeTicks - 1)
