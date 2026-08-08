@@ -1,0 +1,27 @@
+# Build output
+/bin/
+/build/
+*.bin
+*.elf
+*.hex
+*.uf2
+*.map
+
+# Go
+*.test
+*.out
+coverage.*
+
+# Vendored toolchain / SDK artifacts (large, fetched not committed)
+/third_party/esp-idf/
+/blobs/libs/
+
+# Measurement scratch — results belong in docs/results/ instead
+*.csv.tmp
+/scratch/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
