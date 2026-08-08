@@ -7,6 +7,7 @@
 package protocol
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 )
@@ -14,6 +15,7 @@ import (
 // FrameType is the 4-bit frame type field (spec.md §4.2).
 type FrameType uint8
 
+// Frame types (spec.md §4.2).
 const (
 	TypeAudio     FrameType = 0x1
 	TypeRelease   FrameType = 0x2
@@ -43,7 +45,7 @@ const (
 	// codec.FrameBytes.
 	AudioPayloadSize = 200
 
-	// ReleasePayloadSize: RELEASE carries no payload.
+	// ReleasePayloadSize is RELEASE's payload size: it carries no payload.
 	ReleasePayloadSize = 0
 
 	// HelloNameSize is the fixed, null-padded name field carried by a
@@ -73,6 +75,7 @@ const (
 	FlagWarn uint8 = 1 << 2
 )
 
+// Sentinel errors returned by UnmarshalHeader, Frame.Marshal, and Unmarshal.
 var (
 	ErrTooShort       = errors.New("protocol: frame shorter than header+tag")
 	ErrUnknownVersion = errors.New("protocol: unknown version")
@@ -98,16 +101,13 @@ type Header struct {
 func (h Header) Marshal() [HeaderSize]byte {
 	var b [HeaderSize]byte
 	b[0] = (Version << 4) | byte(h.Type&0x0f)
-	b[1] = byte(h.SenderID >> 8)
-	b[2] = byte(h.SenderID)
-	b[3] = byte(h.SessionID >> 8)
-	b[4] = byte(h.SessionID)
-	b[5] = byte(h.Sequence >> 24)
-	b[6] = byte(h.Sequence >> 16)
-	b[7] = byte(h.Sequence >> 8)
-	b[8] = byte(h.Sequence)
-	b[9] = byte(uint16(h.Predictor) >> 8)
-	b[10] = byte(uint16(h.Predictor))
+	binary.BigEndian.PutUint16(b[1:3], h.SenderID)
+	binary.BigEndian.PutUint16(b[3:5], h.SessionID)
+	binary.BigEndian.PutUint32(b[5:9], h.Sequence)
+	//nolint:gosec // bit-preserving two's-complement reinterpretation,
+	// not truncation — encoding/binary only takes unsigned types, and
+	// this round-trips exactly through UnmarshalHeader's matching cast.
+	binary.BigEndian.PutUint16(b[9:11], uint16(h.Predictor))
 	b[11] = h.StepIndex
 	b[12] = h.Flags
 	return b
@@ -129,10 +129,11 @@ func UnmarshalHeader(b []byte) (Header, error) {
 	}
 	return Header{
 		Type:      typ,
-		SenderID:  uint16(b[1])<<8 | uint16(b[2]),
-		SessionID: uint16(b[3])<<8 | uint16(b[4]),
-		Sequence:  uint32(b[5])<<24 | uint32(b[6])<<16 | uint32(b[7])<<8 | uint32(b[8]),
-		Predictor: int16(uint16(b[9])<<8 | uint16(b[10])),
+		SenderID:  binary.BigEndian.Uint16(b[1:3]),
+		SessionID: binary.BigEndian.Uint16(b[3:5]),
+		Sequence:  binary.BigEndian.Uint32(b[5:9]),
+		//nolint:gosec // matching reinterpretation of Marshal's cast above
+		Predictor: int16(binary.BigEndian.Uint16(b[9:11])),
 		StepIndex: b[11],
 		Flags:     b[12],
 	}, nil

@@ -40,6 +40,8 @@ const (
 // Status is the local device's current view of the floor.
 type Status uint8
 
+// Status values. Idle is the zero value, matching a fresh Machine's
+// state before any PTT press or received frame.
 const (
 	Idle    Status = iota // floor is free
 	Holding               // the local device itself holds the floor
@@ -210,6 +212,9 @@ type AdvanceResult struct {
 // on their own.
 func (m *Machine) Advance(now Tick) AdvanceResult {
 	switch m.status {
+	case Idle:
+		// Nothing to expire: no hold window and no transmit timeout
+		// apply when the floor isn't claimed by anyone.
 	case Busy:
 		if now-m.lastHeard >= HoldWindowTicks {
 			m.status = Idle

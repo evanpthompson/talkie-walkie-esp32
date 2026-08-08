@@ -1,6 +1,9 @@
 package protocol
 
-import "fmt"
+import (
+	"encoding/binary"
+	"fmt"
+)
 
 // EncodeHelloName packs a rider name into the fixed HelloNameSize payload
 // of a HELLO frame, null-padded. Names longer than HelloNameSize bytes are
@@ -29,7 +32,10 @@ func DecodeHelloName(payload []byte) (string, error) {
 // EncodeCollisionIDs packs the two sender_ids observed colliding within
 // one hold window (ADR-0005) into a COLLISION frame's payload.
 func EncodeCollisionIDs(a, b uint16) []byte {
-	return []byte{byte(a >> 8), byte(a), byte(b >> 8), byte(b)}
+	out := make([]byte, CollisionPayloadSize)
+	binary.BigEndian.PutUint16(out[0:2], a)
+	binary.BigEndian.PutUint16(out[2:4], b)
+	return out
 }
 
 // DecodeCollisionIDs unpacks a COLLISION frame's payload into the two
@@ -39,7 +45,7 @@ func DecodeCollisionIDs(payload []byte) (a, b uint16, err error) {
 		return 0, 0, fmt.Errorf("%w: COLLISION wants %d bytes, got %d",
 			ErrPayloadSize, CollisionPayloadSize, len(payload))
 	}
-	a = uint16(payload[0])<<8 | uint16(payload[1])
-	b = uint16(payload[2])<<8 | uint16(payload[3])
+	a = binary.BigEndian.Uint16(payload[0:2])
+	b = binary.BigEndian.Uint16(payload[2:4])
 	return a, b, nil
 }

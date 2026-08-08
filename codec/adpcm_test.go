@@ -7,7 +7,7 @@ import (
 
 // sineSamples generates n samples of a 16-bit sine wave at freqHz, sampled
 // at 16 kHz, at the given amplitude fraction of full scale.
-func sineSamples(n int, freqHz float64, amplitude float64) []int16 {
+func sineSamples(n int, freqHz, amplitude float64) []int16 {
 	const sampleRate = 16000.0
 	out := make([]int16, n)
 	for i := range out {
@@ -114,7 +114,7 @@ func TestReseedMatchesContinuousDecode(t *testing.T) {
 	}
 	frames := make([]frame, numFrames)
 	state := State{}
-	for i := 0; i < numFrames; i++ {
+	for i := range numFrames {
 		start := i * SamplesPerFrame
 		end := start + SamplesPerFrame
 		before := state
@@ -172,18 +172,29 @@ func TestSilenceNoPanic(t *testing.T) {
 
 // TestFullScaleNoOverflow drives the encoder with a constant full-scale
 // signal (and its negative) to check the predictor clamps instead of
-// wrapping.
+// wrapping. A decoded value is already typed int16, so it can never
+// itself be "out of int16 range" — the real risk is the intermediate
+// int32 predictor overflowing before clampInt16 catches it, which would
+// surface as the step index escaping its table bounds or the decoded
+// signal wrapping to the opposite sign of a sustained one-sided input.
 func TestFullScaleNoOverflow(t *testing.T) {
 	for _, amp := range []int16{32767, -32768} {
 		samples := make([]int16, SamplesPerFrame)
 		for i := range samples {
 			samples[i] = amp
 		}
-		packed, _ := Encode(samples, State{})
-		decoded, _ := Decode(packed, len(samples), State{})
+		packed, encState := Encode(samples, State{})
+		decoded, decState := Decode(packed, len(samples), State{})
+
+		if encState.StepIndex > 88 {
+			t.Fatalf("amp=%d: encoder step index %d exceeds table bound", amp, encState.StepIndex)
+		}
+		if decState.StepIndex > 88 {
+			t.Fatalf("amp=%d: decoder step index %d exceeds table bound", amp, decState.StepIndex)
+		}
 		for i, v := range decoded {
-			if v > 32767 || v < -32768 {
-				t.Fatalf("sample %d: decoded value %d out of int16 range", i, v)
+			if (amp > 0 && v < 0) || (amp < 0 && v > 0) {
+				t.Fatalf("amp=%d: sample %d decoded to %d — wrong sign, predictor wrapped instead of clamping", amp, i, v)
 			}
 		}
 	}
@@ -191,8 +202,9 @@ func TestFullScaleNoOverflow(t *testing.T) {
 
 // TestClippingSquareWaveNoPanic drives worst-case sample-to-sample deltas
 // (alternating full-scale-positive/full-scale-negative) — the largest
-// possible diff the quantizer can see — and checks for no panic and no
-// out-of-range output.
+// possible diff the quantizer can see — and checks for no panic and that
+// the codec's internal state (predictor/step index) stays within valid
+// bounds rather than overflowing.
 func TestClippingSquareWaveNoPanic(t *testing.T) {
 	samples := make([]int16, SamplesPerFrame)
 	for i := range samples {
@@ -202,15 +214,14 @@ func TestClippingSquareWaveNoPanic(t *testing.T) {
 			samples[i] = -32768
 		}
 	}
-	packed, finalState := Encode(samples, State{})
-	decoded, _ := Decode(packed, len(samples), State{})
-	for i, v := range decoded {
-		if v > 32767 || v < -32768 {
-			t.Fatalf("sample %d: decoded value %d out of int16 range", i, v)
-		}
+	packed, encState := Encode(samples, State{})
+	_, decState := Decode(packed, len(samples), State{})
+
+	if encState.StepIndex > 88 {
+		t.Fatalf("encoder step index %d exceeds table bound", encState.StepIndex)
 	}
-	if finalState.StepIndex > 88 {
-		t.Fatalf("step index %d exceeds table bound", finalState.StepIndex)
+	if decState.StepIndex > 88 {
+		t.Fatalf("decoder step index %d exceeds table bound", decState.StepIndex)
 	}
 }
 

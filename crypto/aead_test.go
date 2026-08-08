@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"bytes"
+	"errors"
 	"math"
 	"testing"
 )
@@ -60,7 +61,7 @@ func TestOpenRejectsBitFlips(t *testing.T) {
 	}
 
 	t.Run("header/AAD", func(t *testing.T) {
-		for bit := 0; bit < len(header)*8; bit++ {
+		for bit := range len(header) * 8 {
 			flipped := flipBit(header, bit)
 			if _, err := Open(key, 0x1234, 0xabcd, 42, flipped, ciphertext, tag); err == nil {
 				t.Fatalf("Open accepted a single-bit flip in header at bit %d", bit)
@@ -69,7 +70,7 @@ func TestOpenRejectsBitFlips(t *testing.T) {
 	})
 
 	t.Run("payload/ciphertext", func(t *testing.T) {
-		for bit := 0; bit < len(ciphertext)*8; bit++ {
+		for bit := range len(ciphertext) * 8 {
 			flipped := flipBit(ciphertext, bit)
 			if _, err := Open(key, 0x1234, 0xabcd, 42, header, flipped, tag); err == nil {
 				t.Fatalf("Open accepted a single-bit flip in ciphertext at bit %d", bit)
@@ -78,7 +79,7 @@ func TestOpenRejectsBitFlips(t *testing.T) {
 	})
 
 	t.Run("tag", func(t *testing.T) {
-		for bit := 0; bit < TagSize*8; bit++ {
+		for bit := range TagSize * 8 {
 			flippedTag := tag
 			flippedTag[bit/8] ^= 1 << (bit % 8)
 			if _, err := Open(key, 0x1234, 0xabcd, 42, header, ciphertext, flippedTag); err == nil {
@@ -96,7 +97,7 @@ func TestNonceReuseRegression(t *testing.T) {
 	// Same sender, same session_id: every sequence must derive a unique
 	// nonce.
 	seen := map[[NonceSize]byte]bool{}
-	for seq := uint32(0); seq < 1000; seq++ {
+	for seq := range uint32(1000) {
 		n := DeriveNonce(0x1234, 0xabcd, seq)
 		if seen[n] {
 			t.Fatalf("nonce repeated within the same session at sequence %d", seq)
@@ -109,7 +110,7 @@ func TestNonceReuseRegression(t *testing.T) {
 	// this is what makes session_id randomization sufficient to prevent
 	// a reboot from reusing a nonce.
 	sessionA, sessionB := uint16(0xabcd), uint16(0x1357)
-	for seq := uint32(0); seq < 1000; seq++ {
+	for seq := range uint32(1000) {
 		if seen[DeriveNonce(0x1234, sessionB, seq)] {
 			t.Fatalf("sequence %d: session %#x nonce collided with session %#x's nonce space", seq, sessionB, sessionA)
 		}
@@ -135,7 +136,7 @@ func TestNonceReuseRegression(t *testing.T) {
 
 func TestSequencerMonotonic(t *testing.T) {
 	var s Sequencer
-	for want := uint32(0); want < 1000; want++ {
+	for want := range uint32(1000) {
 		got, err := s.Next()
 		if err != nil {
 			t.Fatalf("Next: %v", err)
@@ -160,10 +161,10 @@ func TestSequencerRefusesWrap(t *testing.T) {
 	}
 
 	// The space is now exhausted. It must refuse rather than wrap to 0.
-	if _, err := s.Next(); err != ErrSequenceExhausted {
+	if _, err := s.Next(); !errors.Is(err, ErrSequenceExhausted) {
 		t.Fatalf("Next() after exhaustion = %v, want ErrSequenceExhausted", err)
 	}
-	if _, err := s.Next(); err != ErrSequenceExhausted {
+	if _, err := s.Next(); !errors.Is(err, ErrSequenceExhausted) {
 		t.Fatalf("repeated Next() after exhaustion = %v, want ErrSequenceExhausted", err)
 	}
 }

@@ -7,6 +7,7 @@
 package crypto
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -14,6 +15,7 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 )
 
+// Sizes, in bytes, of the AEAD's key, nonce, and authentication tag.
 const (
 	KeySize   = chacha20poly1305.KeySize   // 32
 	NonceSize = chacha20poly1305.NonceSize // 12
@@ -24,6 +26,8 @@ const (
 // deliberately deferred; development builds use a compile-time key).
 type Key [KeySize]byte
 
+// ErrOpen is returned by Open when authentication fails: a tampered
+// payload, header, tag, or a nonce that doesn't match what Seal used.
 var ErrOpen = errors.New("crypto: authentication failed")
 
 // DeriveNonce builds the 12-byte AEAD nonce per spec.md §4.1:
@@ -32,14 +36,9 @@ var ErrOpen = errors.New("crypto: authentication failed")
 // additional wire bytes.
 func DeriveNonce(senderID, sessionID uint16, sequence uint32) [NonceSize]byte {
 	var n [NonceSize]byte
-	n[0] = byte(senderID >> 8)
-	n[1] = byte(senderID)
-	n[2] = byte(sessionID >> 8)
-	n[3] = byte(sessionID)
-	n[4] = byte(sequence >> 24)
-	n[5] = byte(sequence >> 16)
-	n[6] = byte(sequence >> 8)
-	n[7] = byte(sequence)
+	binary.BigEndian.PutUint16(n[0:2], senderID)
+	binary.BigEndian.PutUint16(n[2:4], sessionID)
+	binary.BigEndian.PutUint32(n[4:8], sequence)
 	// n[8:12] stay zero.
 	return n
 }

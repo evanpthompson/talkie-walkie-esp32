@@ -117,8 +117,8 @@ func TestUnmarshalRejectsOverLong(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
-	over := append(b, 0x00) // one byte past this AUDIO frame's exact size
-	if _, err := Unmarshal(over); err == nil {
+	b = append(b, 0x00) // one byte past this AUDIO frame's exact size
+	if _, err := Unmarshal(b); err == nil {
 		t.Error("Unmarshal accepted a frame one byte longer than its type allows")
 	}
 
@@ -156,11 +156,13 @@ func TestUnmarshalRejectsUnknownType(t *testing.T) {
 // Unmarshal. Nothing here is expected to succeed; the only requirement is
 // that corrupt input is rejected cleanly and never panics.
 func TestUnmarshalFuzzNoPanic(t *testing.T) {
+	//nolint:gosec // deterministic, reproducible test input is the
+	// point; cryptographic randomness is not wanted here.
 	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 10000; i++ {
+	for range 10000 {
 		n := rng.Intn(MaxFrameSize + 20)
 		b := make([]byte, n)
-		rng.Read(b)
+		_, _ = rng.Read(b) // math/rand.Rand.Read never errors
 		func() {
 			defer func() {
 				if r := recover(); r != nil {

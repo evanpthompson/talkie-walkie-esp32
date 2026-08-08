@@ -113,6 +113,9 @@ func EncodeSample(sample int16, state State) (code uint8, next State) {
 		Predictor: valpred32,
 		StepIndex: clampIndex(index),
 	}
+	//nolint:gosec // delta is built from OR'd bits 1,2,4,8 plus the sign
+	// bit, so it is always in [0,15]; the conversion to uint8 (a 4-bit
+	// code) can never truncate.
 	return uint8(delta), next
 }
 
@@ -181,7 +184,7 @@ func Encode(samples []int16, state State) (packed []byte, next State) {
 // n must not exceed 2*len(packed).
 func Decode(packed []byte, n int, state State) (samples []int16, next State) {
 	samples = make([]int16, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		b := packed[i/2]
 		var code uint8
 		if i%2 == 0 {

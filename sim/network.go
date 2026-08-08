@@ -59,8 +59,11 @@ func New(ids []uint16, seed int64) *Network {
 		reach:    make(map[pair]bool),
 		minLat:   1,
 		maxLat:   1,
-		rng:      rand.New(rand.NewSource(seed)),
-		inbox:    make(map[channel.Tick][]delivery),
+		//nolint:gosec // deterministic, reproducible seeding is the
+		// point (testing.md: "all scenarios use fixed seeds so failures
+		// reproduce exactly") — cryptographic randomness is not wanted.
+		rng:   rand.New(rand.NewSource(seed)),
+		inbox: make(map[channel.Tick][]delivery),
 	}
 	for _, id := range ids {
 		n.machines[id] = channel.New(id)
@@ -86,8 +89,10 @@ func (n *Network) SetReachable(a, b uint16, reachable bool) {
 func (n *Network) SetLoss(pct int) { n.lossPct = pct }
 
 // SetLatency sets the delivery delay range in ticks, inclusive. Pass
-// equal min and max for fixed latency.
-func (n *Network) SetLatency(min, max channel.Tick) { n.minLat, n.maxLat = min, max }
+// equal minTicks and maxTicks for fixed latency.
+func (n *Network) SetLatency(minTicks, maxTicks channel.Tick) {
+	n.minLat, n.maxLat = minTicks, maxTicks
+}
 
 // Status reports node id's current view of the floor.
 func (n *Network) Status(id uint16) channel.Status { return n.machines[id].Status() }
@@ -114,7 +119,7 @@ func (n *Network) ReleasePTT(id uint16) bool {
 	if !n.machines[id].ReleasePTT() {
 		return false
 	}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		n.broadcast(id, protocol.TypeRelease, 0, 0)
 	}
 	return true
@@ -136,6 +141,9 @@ func (n *Network) broadcast(from uint16, kind protocol.FrameType, lower, higher 
 		}
 		lat := n.minLat
 		if n.maxLat > n.minLat {
+			//nolint:gosec // Intn's result is bounded to
+			// [0, maxLat-minLat], always non-negative and within
+			// channel.Tick's range.
 			lat += channel.Tick(n.rng.Intn(int(n.maxLat-n.minLat) + 1))
 		}
 		at := n.tick + lat
@@ -145,7 +153,7 @@ func (n *Network) broadcast(from uint16, kind protocol.FrameType, lower, higher 
 
 // Advance runs the network forward by count ticks.
 func (n *Network) Advance(count int) {
-	for i := 0; i < count; i++ {
+	for range count {
 		n.step()
 	}
 }
@@ -166,6 +174,10 @@ func (n *Network) step() {
 			m.ReceiveRelease(d.from)
 		case protocol.TypeCollision:
 			m.ReceiveCollision(d.lower, d.higher, n.tick)
+		case protocol.TypeHello:
+			// Presence beacons aren't modeled: this harness exercises
+			// floor-control convergence (testing.md §3's T2 scenarios),
+			// not the roster/liveness mechanism HELLO serves.
 		}
 	}
 	delete(n.inbox, n.tick)

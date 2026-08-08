@@ -4,7 +4,7 @@ import "testing"
 
 func TestReplayWindowAcceptsInOrder(t *testing.T) {
 	var w ReplayWindow
-	for seq := uint32(0); seq < 200; seq++ {
+	for seq := range uint32(200) {
 		if !w.Accept(seq) {
 			t.Fatalf("Accept(%d) = false, want true for strictly increasing sequence", seq)
 		}

@@ -131,6 +131,8 @@ func (b *Buffer) conceal() []int16 {
 	out := make([]int16, codec.SamplesPerFrame)
 	shift := b.concealShift
 	for i, s := range b.lastGood {
+		//nolint:gosec // right-shifting an int16 only reduces its
+		// magnitude, so the result always fits back in int16.
 		out[i] = int16(int32(s) >> shift)
 	}
 	if shift < concealShiftCap {

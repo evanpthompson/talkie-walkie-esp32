@@ -195,7 +195,7 @@ func TestBoundedDepthUnderOverDelivery(t *testing.T) {
 
 	var b Buffer
 	accepted := 0
-	for seq := uint32(0); seq < 10000; seq++ {
+	for seq := range uint32(10000) {
 		if b.Push(seq, payload, state) {
 			accepted++
 		}
