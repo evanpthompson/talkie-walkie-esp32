@@ -174,15 +174,27 @@ assumed.
 
 ### Phase 1 · Core peripherals
 
-#### A1.1 · GPIO in and out
-**Deliverables:** `machine_esp32c5.go` (port from the 554-line C6 file);
-button input with debounce; external LED.
-**Done:** criteria 1.1, 1.2. Avoid strapping pins; the onboard RGB LED is
-**not** a target ([`hardware.md` §2](hardware.md#2-pins-that-are-not-available)).
-**Effort:** ~1–2 sessions.
+#### A1.1 · GPIO in and out — **done**
+**Actual deliverables:** `machine_esp32c5.go` (ported from the C6 file,
+but with IO_MUX bit positions re-read from the generated device package
+per pin — they don't match the C6's, per ADR-0002); debounced button on
+`GPIO24` (**not** the originally-planned `GPIO14` — that's `USB_D+` on
+this board, see [results/phase-1-a1.1.md](results/phase-1-a1.1.md));
+external LED on `GPIO23`.
+**Done:** criteria 1.1 (**100/100 presses, zero missed or doubled,
+verified programmatically**), 1.2. Avoid strapping pins; the onboard RGB
+LED is **not** a target ([`hardware.md` §2](hardware.md#2-pins-that-are-not-available)).
+**Found a real driver bug in the process** — a GPIO-matrix constant
+copied from the C6 was wrong for the C5, silently breaking both digital
+output and (empirically, mechanism not fully explained) the input
+pull-up. Full detail and the diagnostic technique that found it:
+[results/phase-1-a1.1.md](results/phase-1-a1.1.md).
+**Effort:** ~1–2 sessions (took most of one, plus the bug hunt).
 
 #### A1.2 · ADC and amp control
-**Deliverables:** ADC driver for battery sense; `SD_MODE` GPIO control.
+**Deliverables:** ADC driver for battery sense; `SD_MODE` GPIO control on
+`GPIO15` (**not** `GPIO13` — same `USB_D-` conflict class as A1.1's
+`GPIO14`, fixed preemptively; see hardware.md's pin table).
 **Done:** criteria 1.3, 1.4.
 **Effort:** ~1 session.
 

@@ -111,10 +111,21 @@ onboard RGB LED is a later nicety, not a bring-up target.
 
 ## 3. Proposed pin assignment
 
-> **Unverified.** These are chosen to avoid strapping, JTAG, and UART pins.
-> They must be confirmed against the v1.2 header silkscreen and the C5
-> IO_MUX before wiring. ESP32 peripherals route through a flexible GPIO
-> matrix, so most assignments are movable if one conflicts.
+> **Partially verified 2026-08-08 (A1.1).** The original version of this
+> table was checked against strapping/JTAG/UART pins only and missed a
+> real conflict class: **GPIO13/GPIO14 are also the native USB D-/D+
+> lines** on this board
+> ([official J3 header table](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32c5/esp32-c5-devkitc-1/user_guide.html)),
+> which held `GPIO14` unresponsive as a plain GPIO input during A1.1's
+> button bring-up regardless of IO_MUX configuration (function select was
+> confirmed correct against the register dump — the USB PHY's own
+> pin-ownership is a separate thing entirely, and nothing in this fork
+> disables it). **GPIO24 and GPIO15 have no secondary function in the
+> official table** (GPIO15 is only unavailable on PSRAM-equipped modules;
+> the HF4 in hand has no PSRAM) and are used below instead. Still
+> unverified: I2S pins (`GPIO6`/`8`/`9`/`10`) and battery sense (`GPIO1`)
+> — confirm each against the official table before wiring, not just this
+> document.
 
 | Function | GPIO | Header | Notes |
 |---|---|---|---|
@@ -122,11 +133,11 @@ onboard RGB LED is a later nicety, not a bring-up target.
 | I2S WS / LRCLK | `GPIO8` | J1 | Shared by mic and amp |
 | I2S DOUT → amp `DIN` | `GPIO9` | J1 | Speaker path |
 | I2S DIN ← mic `SD` | `GPIO10` | J1 | Microphone path |
-| Amp `SD_MODE` | `GPIO13` | J3 | Shutdown / gain select |
-| PTT button | `GPIO14` | J3 | Active-low, internal pull-up |
-| Status LED (external) | `GPIO23` | J3 | Plain LED, not addressable |
+| Amp `SD_MODE` | `GPIO15` | J3 | Shutdown / gain select. **Not GPIO13** — that's `USB_D-`/`SDIO_DATA3` |
+| PTT button | `GPIO24` | J3 | Active-low, internal pull-up. **Not GPIO14** — that's `USB_D+`/`SDIO_DATA2`, confirmed dead as plain GPIO in A1.1 |
+| Status LED (external) | `GPIO23` | J3 | Plain LED, not addressable. Confirmed conflict-free |
 | Battery sense | `GPIO1` | J1 | ADC-capable |
-| *Spare* | `GPIO0`, `GPIO24`, `GPIO15` | — | GPIO15 free only without PSRAM |
+| *Spare* | `GPIO0`, `GPIO7` | — | Not yet cross-checked against the official table |
 
 **One I2S controller, shared.** The C5 has a single I2S peripheral, so
 capture and playback run full-duplex on one bus with common BCLK and WS.
