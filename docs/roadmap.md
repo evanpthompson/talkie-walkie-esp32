@@ -98,11 +98,22 @@ would be impractical to stage physically.*
 
 ## Track A — Firmware
 
-### Phase 0 · TinyGo/C5 bring-up — **hard gate**
+### Phase 0 · TinyGo/C5 bring-up — **hard gate — PASSED (2026-08-08)**
 
 > If this phase fails against its effort budget, **stop** and re-evaluate
 > against esp-hal (Rust) or ESP-IDF (C). Do not grind
 > ([ADR-0002](adr/0002-firmware-toolchain.md)).
+
+**Result:** all five criteria pass on real hardware. Two hardware-only bugs
+found and fixed — the C5's ROM reads the image header from a fixed `0x2000`
+(not `0x0` like C3/C6), and `Cache_MSPI_MMU_Set`'s `paddr` must be
+64KB-aligned, which `0x2000` isn't — requiring a real two-stage boot
+(`esp32c5-stage0` bootloader + application at `0x10000`), not a one-line
+fix. `ets_delay_us` and the TIMG0 timer both needed empirical clock
+calibration (~48MHz measured, not a datasheet value). Full detail:
+[`docs/results/phase-0.md`](results/phase-0.md). **An ADR for the
+two-stage boot architecture is still owed** — it's now permanent, not
+Phase-0-only.
 
 #### A0.1 · Toolchain baseline
 **Goal:** build TinyGo from source; confirm the environment works before
@@ -133,23 +144,33 @@ cleanly and silently misbehaves — `ets_delay_us` becomes
 variants do not exist.
 **Effort:** ~1 session.
 
-#### A0.4 · Boot stub and first flash
+#### A0.4 · Boot stub and first flash — **done**
 **Goal:** get code executing on silicon.
 **Prereqs:** A0.3.
-**Deliverables:** `src/device/esp/esp32c5.S`; minimal runtime; clock init at
-XTAL speed (defer PLL/240 MHz).
-**Done:** binary flashes via espflasher and the chip does not reset-loop.
+**Actual deliverables:** `src/device/esp/esp32c5.S` (application) **plus**
+a second, fully SRAM-resident target `esp32c5-stage0` — required because
+the ROM's fixed `0x2000` image-search offset isn't 64KB-aligned, which
+`Cache_MSPI_MMU_Set` requires. No clock reconfiguration (stays at
+reset-default, empirically ~48MHz — see A0.5).
+**Done:** binary flashes via `tinygo flash` (both targets) and the chip
+does not reset-loop. See [results/phase-0.md](results/phase-0.md) for the
+two bugs this actually took.
 **Note:** interrupts masked; polling only. CLIC comes in A2.1.
-**Effort:** ~1–2 sessions.
+**Effort:** ~1–2 sessions (took ~1, including diagnosing both bugs).
 
-#### A0.5 · UART output — **the gate**
+#### A0.5 · UART output — **the gate — done**
 **Goal:** observable proof of life.
 **Prereqs:** A0.4.
-**Deliverables:** UART driver (38/38 registers align with C6 — the easiest
-peripheral); a hello-world that prints.
-**Done:** [`testing.md` Phase 0 criteria 0.1–0.5](testing.md#phase-0--tinygoc5-bring-up-hard-gate),
-**including 0.4 — verify `ets_delay_us` timing against a known interval.**
-**Effort:** ~1 session.
+**Actual deliverables:** no register-level UART driver written yet —
+`putchar` shims directly to the ROM's own `uart_tx_one_char` (the same
+routine the ROM used for the flashing handshake, so UART0 is already
+correctly configured). A real peripheral-level UART driver is still A1.1+
+scope. `ets_update_cpu_frequency(48)` calibration call added; TIMG0 tick
+constant corrected from the C6's 40MHz assumption to the measured 24MHz.
+**Done:** [`testing.md` Phase 0 criteria 0.1–0.5](testing.md#phase-0--tinygoc5-bring-up-hard-gate)
+all pass — **including 0.4**, verified against real UART timestamps, not
+assumed.
+**Effort:** ~1 session (as estimated).
 
 ### Phase 1 · Core peripherals
 
@@ -289,7 +310,7 @@ Ordered by uncertainty, not sequence:
 
 | Rank | Item | Session | Why |
 |---|---|---|---|
-| 1 | **Phase 0 gate** | A0.1–A0.5 | TinyGo has never run on C5. Hard stop if it fails. |
+| 1 | ~~**Phase 0 gate**~~ **— cleared 2026-08-08** | A0.1–A0.5 | TinyGo boots on C5 and prints over UART, hardware-verified. Two real bugs found (ROM image offset, MMU alignment) — see [results/phase-0.md](results/phase-0.md). |
 | 2 | **CLIC driver** | A2.1 | Genuinely new; no C6 code reusable |
 | 3 | **espradio C5 port** | A3.2 | Young upstream, never targeted a third chip |
 | 4 | **I2S from scratch** | A2.2–A2.3 | Unimplemented for *any* ESP32 in TinyGo |

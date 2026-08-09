@@ -60,6 +60,20 @@ PSRAM-equipped modules.
 Ignore anything referencing `esp32c5beta3` — a different chip with IROM at
 `0x41000000`.
 
+### Flash layout — two images, two fixed offsets
+
+The board's flash holds **two** separate TinyGo images ([ADR-0009](adr/0009-two-stage-boot.md)):
+
+| Offset | Image | Changes how often |
+|---|---|---|
+| `0x2000` | `esp32c5-stage0` bootloader | Rarely — flash once, forget |
+| `0x10000` | The application (`esp32c5-devkitc-1` target) | Every dev iteration |
+
+Both are required for the application to boot. A full chip erase (or a
+fresh/blank board) wipes both — reflash stage 0 before debugging why the
+application "isn't doing anything," since a missing stage 0 produces no
+error, just an unresponsive board.
+
 ---
 
 ## 2. Pins that are not available

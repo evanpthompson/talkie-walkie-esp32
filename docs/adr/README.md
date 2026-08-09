@@ -18,6 +18,7 @@ old one rather than editing history.
 | [0006](0006-security-model.md) | Application-layer AEAD, pre-shared group key | Accepted | Key distribution UX proves unworkable |
 | [0007](0007-power-architecture.md) | Always-on receive, battery sized for it | Accepted | Phase 6 measurements justify duty-cycling |
 | [0008](0008-test-strategy.md) | Host-first testing, hardware last | Accepted | — |
+| [0009](0009-two-stage-boot.md) | Two-stage boot: fixed stage-0 loader + application | Accepted | Track A needs OTA/multiple app images |
 
 ## Why these are written down
 
